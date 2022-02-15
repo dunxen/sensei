@@ -21,9 +21,19 @@ pub const DEFAULT_REQUEST_TIMEOUT_SECONDS: Option<u8> = Some(10);
 pub const DEFAULT_STOP_GAP: usize = 20;
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
+pub struct BitcoindConfig {
+    pub host: String,
+    pub port: u16,
+    pub rpc_username: String,
+    pub rpc_password: String,
+}
+
+#[derive(Clone, Serialize, Deserialize, Debug)]
 pub enum LightningNodeBackendConfig {
     #[serde(rename = "electrum")]
     Electrum(ElectrumBlockchainConfig),
+    #[serde(rename = "bitcoind")]
+    Bitcoind(BitcoindConfig)
 }
 
 impl Default for LightningNodeBackendConfig {
@@ -46,6 +56,15 @@ impl LightningNodeBackendConfig {
             retry: DEFAULT_RETRY_ATTEMPTS,
             timeout: DEFAULT_REQUEST_TIMEOUT_SECONDS,
             stop_gap: DEFAULT_STOP_GAP,
+        })
+    }
+
+    pub fn new_bitcoind(host: String, port: u16, rpc_username: String, rpc_password: String) -> Self {
+        LightningNodeBackendConfig::Bitcoind(BitcoindConfig {
+            host,
+            port,
+            rpc_username,
+            rpc_password
         })
     }
 }

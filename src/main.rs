@@ -20,6 +20,7 @@ mod lib;
 mod node;
 mod services;
 mod utils;
+mod chain;
 
 use crate::config::{SenseiConfig, LightningNodeBackendConfig};
 use crate::database::admin::AdminDatabase;
@@ -45,14 +46,16 @@ use grpc::admin::{AdminServer, AdminService as GrpcAdminService};
 use grpc::node::{NodeServer, NodeService as GrpcNodeService};
 use lightning_background_processor::BackgroundProcessor;
 use node::LightningNode;
-use services::admin::AdminService;
+use services::admin::{AdminService, AdminRequest, AdminResponse};
 use std::collections::HashMap;
 use std::fs;
-use std::sync::Arc;
-use tokio::sync::Mutex;
+use std::sync::{Arc};
+use tokio::sync::{Mutex, mpsc};
 use tokio::task::JoinHandle;
 use tonic::transport::Server;
 use tower_http::cors::{CorsLayer, Origin};
+
+use tokio::sync::mpsc::{Sender, Receiver};
 
 #[macro_use]
 extern crate lazy_static;
@@ -69,7 +72,6 @@ pub struct NodeHandle {
 
 pub type NodeDirectory = Arc<Mutex<HashMap<String, NodeHandle>>>;
 
-#[derive(Clone)]
 pub struct RequestContext {
     pub node_directory: NodeDirectory,
     pub admin_service: AdminService,
@@ -81,13 +83,31 @@ pub struct RequestContext {
 #[clap(version)]
 struct SenseiArgs {
     /// Sensei data directory, defaults to home directory
-    #[clap(short, long)]
+    #[clap(long)]
     data_dir: Option<String>,
-    #[clap(short, long)]
+    #[clap(long)]
     network: Option<String>,
-    #[clap(short, long)]
+    #[clap(long, arg_enum)]
+    backend: Option<ChainBackend>,
+    #[clap(long)]
     electrum_url: Option<String>,
+    #[clap(long)]
+    bitcoin_rpc_host: Option<String>,
+    #[clap(long)]
+    bitcoin_rpc_port: Option<u16>,
+    #[clap(long)]
+    bitcoin_rpc_username: Option<String>,
+    #[clap(long)]
+    bitcoin_rpc_password: Option<String>,
 }
+
+#[derive(clap::ArgEnum, Clone, Debug)]
+enum ChainBackend {
+    Electrum,
+    Bitcoind
+}
+
+pub type AdminRequestResponse = (AdminRequest, Sender<AdminResponse>);
 
 #[tokio::main]
 async fn main() {
@@ -117,9 +137,23 @@ async fn main() {
     let network_config_path = format!("{}/{}/config.json", sensei_dir, root_config.network);
     let mut config = SenseiConfig::from_file(network_config_path, Some(root_config));
 
-    if let Some(electrum_url) = args.electrum_url {
-        config.set_backend(LightningNodeBackendConfig::electrum_from_url(electrum_url));
+    if let Some(backend) = args.backend {
+        match backend {
+            ChainBackend::Electrum => {
+                let electrum_url = args.electrum_url.expect("electrum backend selected but no url set. use --electrum-url=<url> to set it");
+                config.set_backend(LightningNodeBackendConfig::electrum_from_url(electrum_url));
+            },
+            ChainBackend::Bitcoind => {
+                let host = args.bitcoin_rpc_host.expect("bitcoind backend selected but no host set. use --bitcoin-rpc-host=<host> to set it");
+                let port = args.bitcoin_rpc_port.expect("bitcoind backend selected but no port set. use --bitcoin-rpc-port=<port> to set it");
+                let username = args.bitcoin_rpc_username.expect("bitcoind backend selected but no username set. use --bitcoin-rpc-username=<username> to set it");
+                let password = args.bitcoin_rpc_password.expect("bitcoind backend selected but no password set. use --bitcoin-rpc-password=<password> to set it");
+                config.set_backend(LightningNodeBackendConfig::new_bitcoind(host, port, username, password));
+            }
+        }
     }
+
+    // TODO: should probably test the backend configuration to make sure it works before proceeding
 
     let sqlite_path = format!("{}/{}/admin.db", sensei_dir, config.network);
     let mut database = AdminDatabase::new(sqlite_path);
@@ -132,16 +166,16 @@ async fn main() {
         &sensei_dir,
         config.clone(),
         node_directory.clone(),
-        database,
+        database
     );
-
+    
     // TODO: this seems odd too, maybe just pass around the 'admin service'
     //       and the servers will use it to get the node from the directory
-    let request_context = RequestContext {
+    let request_context = Arc::new(RequestContext {
         node_directory: node_directory.clone(),
-        admin_service,
-    };
-
+        admin_service
+    });
+    
     let router = Router::new()
         .route("/admin", get(live))
         .nest(
@@ -189,7 +223,7 @@ async fn main() {
         .add_service(NodeServer::new(GrpcNodeService {
             request_context: request_context.clone(),
         }))
-        .add_service(AdminServer::new(GrpcAdminService { request_context }))
+        .add_service(AdminServer::new(GrpcAdminService { request_context: request_context.clone() }))
         .into_service();
 
     let hybrid_service = hybrid::hybrid(http_service, grpc_service);

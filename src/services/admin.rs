@@ -8,9 +8,10 @@
 // licenses.
 
 use super::{PaginationRequest, PaginationResponse};
+use crate::AdminRequestResponse;
+use crate::chain::manager::SenseiChainManager;
 use crate::error::Error as SenseiError;
 use crate::{
-    config::LightningNodeBackendConfig,
     database::{
         self,
         admin::{AdminDatabase, Node, Role, Status},
@@ -24,6 +25,7 @@ use crate::{
 };
 
 use serde::Serialize;
+use std::sync::mpsc::Receiver;
 use std::{collections::hash_map::Entry, fs, sync::Arc};
 use tokio::sync::Mutex;
 pub enum AdminRequest {
@@ -104,6 +106,7 @@ pub struct AdminService {
     pub config: Arc<Mutex<SenseiConfig>>,
     pub node_directory: NodeDirectory,
     pub database: Arc<Mutex<AdminDatabase>>,
+    pub chain_manager: Arc<SenseiChainManager>,
 }
 
 impl AdminService {
@@ -111,13 +114,14 @@ impl AdminService {
         data_dir: &str,
         config: SenseiConfig,
         node_directory: NodeDirectory,
-        database: AdminDatabase,
+        database: AdminDatabase
     ) -> Self {
         Self {
             data_dir: String::from(data_dir),
-            config: Arc::new(Mutex::new(config)),
+            config: Arc::new(Mutex::new(config.clone())),
             node_directory,
             database: Arc::new(Mutex::new(database)),
+            chain_manager: Arc::new(SenseiChainManager::new(config).unwrap())
         }
     }
 }
@@ -401,7 +405,8 @@ impl AdminService {
                                 node_config,
                                 Some(network_graph),
                                 Some(network_graph_message_handler),
-                            )
+                                self.chain_manager.clone()
+                            ).await
                         }
                         Entry::Vacant(_entry) => Err(crate::error::Error::AdminNodeNotStarted),
                     }
@@ -409,7 +414,7 @@ impl AdminService {
                 None => Err(crate::error::Error::AdminNodeNotCreated),
             }
         } else {
-            LightningNode::new(node_config, None, None)
+            LightningNode::new(node_config, None, None, self.chain_manager.clone()).await
         }
     }
 
@@ -450,7 +455,7 @@ impl AdminService {
                 node.pubkey.clone(),
                 node.listen_port
             );
-            let (handles, background_processor) = start_lightning_node.start();
+            let (handles, background_processor) = start_lightning_node.start().await;
             entry.insert(NodeHandle {
                 node: Arc::new(lightning_node.clone()),
                 background_processor,

@@ -35,8 +35,9 @@ serde_json = { version = "1.0" }
 ureq = { version = "~2.2.0", features = ["json"] }
 tokio = { version = "1", features = [ "io-util", "macros", "rt", "rt-multi-thread", "sync", "net", "time" ] }
 log = "^0.4"
-bdk = { git = "https://github.com/johncantrell97/bdk" }
-bdk-ldk = { git = "https://github.com/johncantrell97/bdk-ldk#aff5a99953121ad3eaed7a415c2f6d208d2df46f" }
+electrum-client = "0.8"
+bitcoincore-rpc = "0.14"
+bdk = { version = "0.16.0", features = ["rpc"] }
 tonic = "0.6"
 prost = "0.9"
 pin-project = "1.0"
