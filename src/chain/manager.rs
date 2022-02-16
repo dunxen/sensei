@@ -1,10 +1,9 @@
 use std::{sync::{Arc, Mutex as SyncMutex}, time::Duration};
 
 use crate::{config::{LightningNodeBackendConfig, BitcoindConfig, SenseiConfig}, node::{ChannelManager, ChainMonitor, SyncableMonitor}};
-use bdk::{blockchain::ElectrumBlockchainConfig};
 use bitcoin::{Txid, Script, Transaction, BlockHash, Block, hashes::hex::FromHex};
 use lightning::chain::{BestBlock, WatchedOutput, Filter, self, Confirm};
-use electrum_client::{Client, ConfigBuilder, ElectrumApi, Socks5Config};
+use electrum_client::{ConfigBuilder, ElectrumApi, Socks5Config};
 use lightning_block_sync::{http::{HttpEndpoint, JsonResponse}, SpvClient};
 use lightning_block_sync::rpc::RpcClient;
 use lightning_block_sync::{AsyncBlockSourceResult, BlockHeaderData, BlockSource, init, poll, UnboundedCache};
@@ -84,17 +83,6 @@ impl BlockSource for &BitcoindClient {
 	}
 }
 
-fn get_electrum_client(config: &ElectrumBlockchainConfig) -> Result<Client, bdk::Error> {
-    let socks5 = config.socks5.as_ref().map(Socks5Config::new);
-    let electrum_config = ConfigBuilder::new()
-        .retry(config.retry)
-        .timeout(config.timeout)?
-        .socks5(socks5)?
-        .build();
-
-    Ok(Client::from_config(config.url.as_str(), electrum_config)?)
-}
-
 pub struct SenseiChainManager {
     config: SenseiConfig,
     listener: Arc<SenseiChainListener>,
@@ -141,9 +129,6 @@ impl SenseiChainManager {
 
     pub async fn synchronize_to_tip(&self, syncable_channel_manager: (BlockHash, &mut ChannelManager), syncable_channel_monitors: Vec<(BlockHash, &mut SyncableMonitor)>) -> Result<(), crate::error::Error> {
         match &self.config.backend {
-            LightningNodeBackendConfig::Electrum(config) => {
-                Ok(())
-            },
             LightningNodeBackendConfig::Bitcoind(config) => {
                 let block_source = self.block_source.as_ref().unwrap();
                 let mut chain_listeners =
@@ -158,16 +143,16 @@ impl SenseiChainManager {
 
                 let mut cache = UnboundedCache::new();
                 
-                // let chain_tip = Some(
-                //     init::synchronize_listeners(
-                //         &mut block_source.deref(),
-                //         self.config.network,
-                //         &mut cache,
-                //         chain_listeners,
-                //     )
-                //     .await
-                //     .unwrap(),
-                // );
+                let chain_tip = Some(
+                    init::synchronize_listeners(
+                        &mut block_source.deref(),
+                        self.config.network,
+                        &mut cache,
+                        chain_listeners,
+                    )
+                    .await
+                    .unwrap(),
+                );
 
                 // TODO: probably want to return the tip, assuming I can get similar object in electrum case
                 Ok(())
@@ -177,9 +162,6 @@ impl SenseiChainManager {
 
     pub async fn keep_in_sync(&self, channel_manager: Arc<ChannelManager>, chain_monitor: Arc<ChainMonitor>) -> Result<(), crate::error::Error> {
         match &self.config.backend {
-            LightningNodeBackendConfig::Electrum(config) => {
-                Ok(())
-            },
             LightningNodeBackendConfig::Bitcoind(config) => {
                 let chain_listener = (chain_monitor, channel_manager);
                 self.listener.add_listener(chain_listener);     
@@ -190,12 +172,6 @@ impl SenseiChainManager {
 
     pub async fn get_best_block(&self) -> Result<BestBlock, crate::error::Error> {
         match &self.config.backend {
-            LightningNodeBackendConfig::Electrum(config) => {
-                let client = get_electrum_client(config)?;
-                let height = client.block_headers_subscribe().map(|data| data.height as u32)?;
-                let header = client.block_header(height as usize)?;
-                Ok(BestBlock::new(header.block_hash(), height))
-            },
             LightningNodeBackendConfig::Bitcoind(config) => {
                 let block_source = self.block_source.as_ref().expect("no block source when using bitcoind");
                 let blockchain_info = block_source.get_blockchain_info().await.unwrap();

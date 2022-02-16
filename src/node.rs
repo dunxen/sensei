@@ -22,7 +22,7 @@ use crate::{database, disk, hex_utils};
 use bdk::blockchain::ConfigurableBlockchain;
 use bdk::keys::ExtendedKey;
 use bdk::TransactionDetails;
-use bdk::{blockchain::{AnyBlockchain, ElectrumBlockchain, rpc::{RpcBlockchain, Auth,RpcConfig}}, database::MemoryDatabase};
+use bdk::{blockchain::{AnyBlockchain, rpc::{RpcBlockchain, Auth,RpcConfig}}, database::MemoryDatabase};
 use bitcoin::hashes::Hash;
 use lightning::chain::channelmonitor::ChannelMonitor;
 use lightning::chain::{Confirm, Listen};
@@ -404,9 +404,6 @@ impl LightningNode {
         let database = MemoryDatabase::default();
 
         let blockchain = match backend {
-            LightningNodeBackendConfig::Electrum(config) => {
-                AnyBlockchain::Electrum(ElectrumBlockchain::from_config(&config)?)
-            },
             LightningNodeBackendConfig::Bitcoind(bitcoind_config) => {
                 let rpc_config = RpcConfig {
                     url: format!("{}:{}", bitcoind_config.host, bitcoind_config.port),
@@ -694,9 +691,6 @@ impl LightningNode {
         // }));
 
         match &self.config.backend {
-            LightningNodeBackendConfig::Electrum(config) => {
-                
-            },
             LightningNodeBackendConfig::Bitcoind(config) => {
                 self.chain_manager.keep_in_sync(channel_manager_sync, chain_monitor_sync).await;
             }

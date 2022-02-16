@@ -103,7 +103,6 @@ struct SenseiArgs {
 
 #[derive(clap::ArgEnum, Clone, Debug)]
 enum ChainBackend {
-    Electrum,
     Bitcoind
 }
 
@@ -139,10 +138,6 @@ async fn main() {
 
     if let Some(backend) = args.backend {
         match backend {
-            ChainBackend::Electrum => {
-                let electrum_url = args.electrum_url.expect("electrum backend selected but no url set. use --electrum-url=<url> to set it");
-                config.set_backend(LightningNodeBackendConfig::electrum_from_url(electrum_url));
-            },
             ChainBackend::Bitcoind => {
                 let host = args.bitcoin_rpc_host.expect("bitcoind backend selected but no host set. use --bitcoin-rpc-host=<host> to set it");
                 let port = args.bitcoin_rpc_port.expect("bitcoind backend selected but no port set. use --bitcoin-rpc-port=<port> to set it");

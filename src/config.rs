@@ -9,7 +9,6 @@
 
 use std::{fs, io};
 
-use bdk::blockchain::ElectrumBlockchainConfig;
 use bitcoin::Network;
 use serde::{Deserialize, Serialize};
 
@@ -30,35 +29,22 @@ pub struct BitcoindConfig {
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
 pub enum LightningNodeBackendConfig {
-    #[serde(rename = "electrum")]
-    Electrum(ElectrumBlockchainConfig),
     #[serde(rename = "bitcoind")]
     Bitcoind(BitcoindConfig)
 }
 
 impl Default for LightningNodeBackendConfig {
     fn default() -> Self {
-        LightningNodeBackendConfig::Electrum(ElectrumBlockchainConfig {
-            url: ELECTRUM_MAINNET_URL.into(),
-            socks5: DEFAULT_SOCKS5_PROXY,
-            retry: DEFAULT_RETRY_ATTEMPTS,
-            timeout: DEFAULT_REQUEST_TIMEOUT_SECONDS,
-            stop_gap: DEFAULT_STOP_GAP,
+        LightningNodeBackendConfig::Bitcoind(BitcoindConfig {
+            host: String::from("127.0.0.1"),
+            port: 8133,
+            rpc_username: String::from("bitcoin"),
+            rpc_password: String::from("bitcoin"),
         })
     }
 }
 
 impl LightningNodeBackendConfig {
-    pub fn electrum_from_url(url: String) -> Self {
-        LightningNodeBackendConfig::Electrum( ElectrumBlockchainConfig {
-            url,
-            socks5: DEFAULT_SOCKS5_PROXY,
-            retry: DEFAULT_RETRY_ATTEMPTS,
-            timeout: DEFAULT_REQUEST_TIMEOUT_SECONDS,
-            stop_gap: DEFAULT_STOP_GAP,
-        })
-    }
-
     pub fn new_bitcoind(host: String, port: u16, rpc_username: String, rpc_password: String) -> Self {
         LightningNodeBackendConfig::Bitcoind(BitcoindConfig {
             host,
