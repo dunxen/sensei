@@ -14,7 +14,6 @@ use crate::database;
 #[derive(Debug)]
 pub enum Error {
     Db(database::Error),
-    TinderCrypt(tindercrypt::errors::Error),
     Macaroon(macaroon::MacaroonError),
     Io(std::io::Error),
     Secp256k1(bitcoin::secp256k1::Error),
@@ -41,7 +40,6 @@ impl Display for Error {
                 database::Error::Generic(str) => str.clone(),
             },
             Error::Macaroon(_e) => "macaroon error".to_string(),
-            Error::TinderCrypt(e) => e.to_string(),
             Error::Io(e) => e.to_string(),
             Error::Secp256k1(e) => e.to_string(),
             Error::Bdk(e) => e.to_string(),
@@ -126,12 +124,6 @@ impl From<lightning::ln::msgs::LightningError> for Error {
 impl From<database::Error> for Error {
     fn from(e: database::Error) -> Self {
         Error::Db(e)
-    }
-}
-
-impl From<tindercrypt::errors::Error> for Error {
-    fn from(e: tindercrypt::errors::Error) -> Self {
-        Error::TinderCrypt(e)
     }
 }
 

@@ -31,7 +31,7 @@ use lightning::ln::msgs::NetAddress;
 use lightning::routing::router::{self, Payee, RouteParameters};
 use lightning_block_sync::init;
 use lightning_invoice::payment::PaymentError;
-use tindercrypt::cryptors::RingCryptor;
+use crate::lib::crypto;
 
 use bdk::template::DescriptorTemplateOut;
 use bitcoin::blockdata::constants::genesis_block;
@@ -273,13 +273,12 @@ impl LightningNode {
         passphrase: String,
         database: &mut NodeDatabase,
     ) -> Result<[u8; 32], Error> {
-        let cryptor = RingCryptor::new();
 
         let mut seed: [u8; 32] = [0; 32];
         match database.get_seed()? {
             Some(encrypted_seed) => {
                 let decrypted_seed =
-                    cryptor.open(passphrase.as_bytes(), encrypted_seed.as_slice())?;
+                    crypto::decrypt(passphrase.as_bytes(), encrypted_seed.as_slice());
 
                 if decrypted_seed.len() != 32 {
                     return Err(Error::InvalidSeedLength);
@@ -288,7 +287,7 @@ impl LightningNode {
             }
             None => {
                 thread_rng().fill_bytes(&mut seed);
-                let encrypted_seed = cryptor.seal_with_passphrase(passphrase.as_bytes(), &seed)?;
+                let encrypted_seed = crypto::encrypt(passphrase.as_bytes(), &seed);
                 database.create_seed(encrypted_seed)?;
             }
         }

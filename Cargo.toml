@@ -23,7 +23,6 @@ base64 = "0.13.0"
 bitcoin = "0.27"
 bitcoin-bech32 = "0.12"
 bech32 = "0.8"
-hex = "0.3"
 futures = "0.3"
 chrono = "0.4"
 rand = "0.4"
@@ -32,12 +31,11 @@ http = "0.2"
 tower = { version = "0.4", features = ["full"] }
 serde = { version = "^1.0", features = ["derive"] }
 serde_json = { version = "1.0" }
-ureq = { version = "~2.2.0", features = ["json"] }
 tokio = { version = "1", features = [ "io-util", "macros", "rt", "rt-multi-thread", "sync", "net", "time" ] }
 log = "^0.4"
-electrum-client = "0.8"
+electrum-client = { version = "0.8", default-features=false, features = ["use-openssl"] }
 bitcoincore-rpc = "0.14"
-bdk = { version = "0.16.0", features = ["rpc"] }
+bdk = { version = "0.16.0", default-features=false, features = ["rpc", "electrum"] }
 tonic = "0.6"
 prost = "0.9"
 pin-project = "1.0"
@@ -47,7 +45,6 @@ headers = "0.3"
 portpicker = "0.1"
 rusqlite = { version = "0.26", features = ["uuid", "bundled"] }
 uuid = { version = "0.8", features = ["serde", "v4"] }
-tindercrypt = { version = "0.3.2", default-features = false }
 macaroon = "0.2"
 tower-http = { version = "0.2.0", features = ["fs", "trace", "cors"] }
 tower-cookies = "0.4"

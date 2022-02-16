@@ -158,16 +158,16 @@ impl SenseiChainManager {
 
                 let mut cache = UnboundedCache::new();
                 
-                let chain_tip = Some(
-                    init::synchronize_listeners(
-                        &mut block_source.deref(),
-                        self.config.network,
-                        &mut cache,
-                        chain_listeners,
-                    )
-                    .await
-                    .unwrap(),
-                );
+                // let chain_tip = Some(
+                //     init::synchronize_listeners(
+                //         &mut block_source.deref(),
+                //         self.config.network,
+                //         &mut cache,
+                //         chain_listeners,
+                //     )
+                //     .await
+                //     .unwrap(),
+                // );
 
                 // TODO: probably want to return the tip, assuming I can get similar object in electrum case
                 Ok(())
